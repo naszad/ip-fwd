@@ -3,19 +3,33 @@
 #include <iostream>
 
 Forwarder::Forwarder(const std::vector<Iface>& ifaces) : ifaces_(ifaces) {
-    std::sort(ifaces_.begin(), ifaces_.end(), [](const Iface& a, const Iface& b) {
-        return a.network().prefix_length() > b.network().prefix_length();
-    });
+    // No need to sort as we'll consider prefix lengths during matching
 }
 
 int Forwarder::forward(const IPv4& ip) {
+    int best_match_id = -1;
+    uint8_t best_prefix_length = 0;
+
     for (auto& iface : ifaces_) {
         if (iface.network().contains(ip)) {
-            iface.increment_count();
-            return iface.id();
+            uint8_t prefix = iface.network().prefix_length();
+            if (prefix > best_prefix_length) {
+                best_prefix_length = prefix;
+                best_match_id = iface.id();
+            }
         }
     }
-    return -1; // Should not happen if a default route is provided
+
+    if (best_match_id != -1) {
+        // Find the interface with this ID and increment its count
+        for (auto& iface : ifaces_) {
+            if (iface.id() == best_match_id) {
+                iface.increment_count();
+                break;
+            }
+        }
+    }
+    return best_match_id;
 }
 
 void Forwarder::report() const {
